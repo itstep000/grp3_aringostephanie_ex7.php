@@ -1,4 +1,12 @@
 <?php
+session_start();
+if (isset($_SESSION['lastSearchTerm'])) {
+    echo "<p>Session Search Term: " . htmlspecialchars($_SESSION['lastSearchTerm']) . "</p>";
+}
+
+if (isset($_COOKIE['lastSearchTerm'])) {
+    echo "<p>Cookie Search Term: " . htmlspecialchars($_COOKIE['lastSearchTerm']) . "</p>";
+}
 
 header("HTTP/1.1 200 OK");
 echo "Request was successful.";
@@ -107,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     } elseif (isset($_POST['clearSearch'])) {
         setcookie("lastSearchTerm", "", time() - 3600); // Clear cookie
+        unset($_SESSION['lastSearchTerm']); // Clear session
         $searchTerm = ""; // Reset search term
     }
 }
@@ -114,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Handling GET requests for search
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
     $searchTerm = trim($_GET['search']);
+    $_SESSION['lastSearchTerm'] = $searchTerm; // Store in session
     setcookie("lastSearchTerm", $searchTerm, time() + 3600 * 24 * 30); // Cookie expires in 30 days
 }
 
@@ -152,13 +162,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
         return matches ? decodeURIComponent(matches[1]) : undefined;
     }
 
-    // On page load, check for the last search term cookie
+    // On page load, check for the last search term from session or cookie
     window.onload = function() {
-        let lastSearchTerm = getCookie("lastSearchTerm");
-        if (lastSearchTerm) {
-            document.getElementById("search").value = lastSearchTerm; // Set input value
-            showHint(lastSearchTerm); // Trigger search with last term
-        }
+        <?php if (isset($_SESSION['lastSearchTerm'])) : ?>
+            document.getElementById("search").value = "<?php echo htmlspecialchars($_SESSION['lastSearchTerm']); ?>"; // Set input value
+            showHint("<?php echo htmlspecialchars($_SESSION['lastSearchTerm']); ?>"); // Trigger search with last term
+        <?php else : ?>
+            let lastSearchTerm = getCookie("lastSearchTerm");
+            if (lastSearchTerm) {
+                document.getElementById("search").value = lastSearchTerm; // Set input value
+                showHint(lastSearchTerm); // Trigger search with last term
+            }
+        <?php endif; ?>
     };
     </script>
 
@@ -175,26 +190,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
             
             <label for="contact" style="font-size: 18px; color: #333;">Contact Number:</label><br>
             <input type="number" id="contact" name="contact" required style="width: 80%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 2px solid #4CAF50;"><br>
-
-            <button type="submit" style="background-color: #2E7D32; color: white; border: 2px solid #f3fadc; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Add Contact</button>
+            
+            <button type="submit" style="background-color: #2E7D32; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer;">Add Contact</button>
         </form>
 
-        <!-- Search Form (AJAX-powered) -->
-        <form onsubmit="return false;" style="margin-bottom: 20px;">
-            <label for="search" style="font-size: 18px; color: #333;">Search by Username:</label><br>
-            <input type="text" id="search" name="search" onkeyup="showHint(this.value)" style="width: 80%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 2px solid #4CAF50;"><br>
+        <!-- Display success message if any -->
+        <?php echo $successMessage; ?>
 
-            <form method="post" action="" style="margin-bottom: 20px;">
-                <button type="submit" name="clearSearch" style="background-color: #f44336; color: white; padding: 10px; border-radius: 5px; cursor: pointer;">Clear Search</button>
-            </form>
+        <!-- Search and Clear Search Forms -->
+        <form method="get" action="" style="margin-bottom: 10px;">
+            <label for="search" style="font-size: 18px; color: #333;">Search:</label><br>
+            <input type="text" id="search" name="search" onkeyup="showHint(this.value)" style="width: 80%; padding: 10px; border-radius: 5px; border: 2px solid #4CAF50;">
         </form>
 
-        <!-- Success Message -->
-        <?php if (!empty($successMessage)) echo $successMessage; ?>
+        <form method="post" action="" style="margin-bottom: 20px;">
+            <input type="hidden" name="clearSearch" value="1">
+            <button type="submit" style="background-color: #f5f5f5; color: #333; border: 1px solid #ccc; padding: 8px 12px; border-radius: 5px; cursor: pointer;">Clear Search</button>
+        </form>
 
-        <!-- Display Contacts -->
+        <!-- Contact List -->
         <div id="contactList">
-            <?php displayContacts($filename, $searchTerm); ?>
+            <?php displayContacts($filename, $_GET['search'] ?? $_SESSION['lastSearchTerm'] ?? ""); ?>
         </div>
     </div>
 
